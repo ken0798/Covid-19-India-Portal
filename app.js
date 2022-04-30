@@ -59,15 +59,15 @@ app.get("/states/", authCredentials, async (req, res) => {
 });
 
 //get Specific State
-app.get("/states/:state_id", authCredentials, async (req, res) => {
-  const { state_id } = req.params;
-  const getStateQuery = `select * from state where state_id=${state_id};`;
+app.get("/states/:stateId/", authCredentials, async (req, res) => {
+  const { stateId } = req.params;
+  const getStateQuery = `select * from state where state_id=${stateId};`;
   const stateInfo = await db.get(getStateQuery);
   res.status(200).send(stateInfo);
 });
 
 //add District Info
-app.post("/districts/", async (req, res) => {
+app.post("/districts/", authCredentials, async (req, res) => {
   const { districtName, stateId, cases, cured, active, deaths } = req.body;
   const addDistrictInfoQuery = `
   INSERT INTO district (districtName, stateId, cases, cured, active, deaths )
@@ -84,25 +84,25 @@ app.post("/districts/", async (req, res) => {
 });
 
 //get district info
-app.get("/districts/:district_id", authCredentials, async (req, res) => {
-  const { district_id } = req.params;
-  const getDistrictQuery = `select * from district where district_id=${district_id};`;
+app.get("/districts/:districtId/", authCredentials, async (req, res) => {
+  const { districtId } = req.params;
+  const getDistrictQuery = `select * from district where district_id=${districtId};`;
   const districtInfo = await db.get(getDistrictQuery);
   res.status(200).send(districtInfo);
 });
 
 //delete district info
-app.delete("/districts/:district_id", async (req, res) => {
-  const { district_id } = req.params;
-  console.log(district_id);
-  const removeInfoQuery = `DELETE FROM district WHERE district_id=${district_id};`;
+app.delete("/districts/:districtId/", authCredentials, async (req, res) => {
+  const { districtId } = req.params;
+  //   console.log(districtId);
+  const removeInfoQuery = `DELETE FROM district WHERE district_id=${districtId};`;
   await db.run(removeInfoQuery);
   res.status(200).send("District Removed");
 });
 
 //update district info
-app.put("/districts/:district_id", async (req, res) => {
-  const { district_id } = req.params;
+app.put("/districts/:districtId/", authCredentials, async (req, res) => {
+  const { districtId } = req.params;
   const { districtName, stateId, cases, cured, active, deaths } = req.body;
   const updateInfoQuery = `update district set
   district_name="${districtName}",
@@ -111,10 +111,32 @@ app.put("/districts/:district_id", async (req, res) => {
    cured=${cured},
    active=${active},
    deaths=${deaths}
-   WHERE district_id = ${district_id};
+   WHERE district_id = ${districtId};
    `;
   await db.run(updateInfoQuery);
   res.status(200).send("District Details Updated");
+});
+
+//get Stats of a state
+app.get("/states/:stateId/stats/", authCredentials, async (req, res) => {
+  const { stateId } = req.params;
+  const getStatsQuery = `select 
+    sum(cases) as total_cases,
+    sum(cured) as total_cured,
+    sum(active) as total_active,
+    sum(deaths) as total_deaths
+    from district
+    where state_id=${stateId}
+    group by state_id ;`;
+  const dbStats = await db.get(getStatsQuery);
+  const obj = {
+    totalCases: dbStats.total_cases,
+    totalCured: dbStats.total_cured,
+    totalActive: dbStats.total_active,
+    totalDeaths: dbStats.total_deaths,
+  };
+  //   console.log(obj);
+  res.status(200).send(obj);
 });
 
 //MiddleWare
@@ -130,7 +152,11 @@ function authCredentials(req, res, next) {
       req.username = decoder.username;
       next();
     } catch (error) {
-      res.status(401).send("Invalid JWT Token");
+      res.status(401).send("No Access");
     }
+  } else {
+    res.status(401).send("Invalid JWT Token");
   }
 }
+
+module.exports = app;
